@@ -1,0 +1,30 @@
+#!/usr/bin/env ruby
+
+require 'bundler/setup'
+require 'pmsx003'
+require 'optparse'
+require 'pry'
+
+le_options = {}
+
+optparse = OptParse.new do |opts|
+  opts.on(
+    '-d device', '--device device', String, 'Path to pmsx003 device (add bp: to use piratebus)'
+  ) do |device|
+    dtc = device.gsub(/^bp:/,'')
+    dev_stat = File.stat(dtc).rdev rescue nil
+    raise 'Connect buspirate first' unless dev_stat
+    raise 'Device argument must be device' if dev_stat.zero?
+
+    le_options[:device] = device
+  end
+end
+optparse.parse!
+le_options.freeze
+if le_options[:device]
+  pms = Pmsx003::Sensor.new(le_options[:device])
+
+  binding.pry
+else
+  puts optparse.to_s
+end
