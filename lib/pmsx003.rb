@@ -9,7 +9,7 @@ require 'pmsx003/commands'
 module Pmsx003
   class Sensor
     include ChecksumHelpers
-    attr_reader :last_read, :last_data, :mode, :sleep
+    attr_reader :last_read, :last_data, :mode, :sleep_s
 
     def initialize(device, mode: :active)
       @device = case device
@@ -27,7 +27,7 @@ module Pmsx003
                   raise ArgumentError, 'Shitty device arg'
                 end
 
-      @sleep = false
+      @sleep_s = false
       switch_mode(mode)
     end
 
@@ -36,7 +36,7 @@ module Pmsx003
       when :active
         @last_data
       when :passive
-        raise 'Device is in sleep mode' if @sleep
+        raise 'Device is in sleep mode' if @sleep_s
         send_command(comm: :read_passive)
         handle_response
       end
@@ -45,11 +45,17 @@ module Pmsx003
     def switch_mode(mode)
       case mode
       when :active
-        send_command(comm: :change_mode, mode: true)
-        init_gathering_thread if @mode != :active
+        if @mode != :active
+          send_command(comm: :change_mode, mode: true)
+          init_gathering_thread if @mode != :active
+        end
       when :passive
-        @gath&.exit if @mode != :passive
-        send_command(comm: :change_mode, mode: false)
+        if @mode != :passive
+          @gath&.exit
+          send_command(comm: :change_mode, mode: false)
+          sleep 0.4
+          clean_device_buffer
+        end
       else
         raise ArgumentError, 'Unknown mode'
       end
@@ -59,7 +65,7 @@ module Pmsx003
 
     def switch_sleep(switch)
       send_command(comm: :change_sleep, mode: !!switch)
-      @sleep = !!switch
+      @sleep_s = !!switch
     end
 
     private
@@ -105,6 +111,10 @@ module Pmsx003
       @last_data = Structs::Response.read(@device).sensor_readings
       @last_read = Time.now
       @last_data
+    end
+
+    def clean_device_buffer
+      @device.read(1) while @device.ready?
     end
   end
 end
