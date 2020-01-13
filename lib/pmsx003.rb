@@ -1,5 +1,6 @@
 require 'serialport'
 require 'rbuspirate'
+require 'timeout'
 
 require 'pmsx003/version'
 require 'pmsx003/structs'
@@ -37,8 +38,43 @@ module Pmsx003
         @last_data
       when :passive
         raise 'Device is in sleep mode' if @sleep_s
-        send_command(comm: :read_passive)
-        handle_response
+
+        retry_times = 2
+        begin
+          Timeout.timeout(5) do
+            send_command(comm: :read_passive)
+            handle_response
+          end
+        rescue Timeout::Error
+          retry_times -= 1
+          discard_device_buffer
+          retry if retry_times.positive?
+          raise 'Device communication error, timeout?'
+        rescue BinData::ValidityError
+          retry_times -= 1
+          discard_device_buffer
+          retry if retry_times.positive?
+          raise 'Device communication error, shitty checksum'
+        end
+      end
+    end
+
+    def listen(interval = false)
+      ![FalseClass, Integer, Float].include?(interval.class) &&
+        raise(ArgumentError, 'Shitty argument')
+
+      interval && @mode == :active &&
+        raise('Cannot set interval if mode is active')
+
+      raise 'Block must be given' unless block_given?
+
+      if @mode == :active
+        loop { yield @gath_queue.pop }
+      else
+        loop do
+          yield fetch
+          sleep interval
+        end
       end
     end
 
@@ -52,9 +88,10 @@ module Pmsx003
       when :passive
         if @mode != :passive
           @gath&.exit
+          remove_instance_variable(:@gath_queue)
           send_command(comm: :change_mode, mode: false)
           sleep 0.4
-          clean_device_buffer
+          discard_device_buffer
         end
       else
         raise ArgumentError, 'Unknown mode'
@@ -86,11 +123,20 @@ module Pmsx003
     end
 
     def init_gathering_thread
-      @gath = Thread.new do |th|
+      @gath_queue = SizedQueue.new(1)
+      @gath = Thread.new do
         loop do
-          handle_response
+          if @sleep
+            handle_response
+          else
+            Timeout.timeout(10) { handle_response }
+          end
+          @gath_queue.pop if @gath_queue.size == @gath_queue.max
+          @gath_queue << @last_data
         rescue BinData::ValidityError
           next
+        rescue Timeout::Error
+          raise 'Device communication error'
         end
       end
     end
@@ -113,7 +159,7 @@ module Pmsx003
       @last_data
     end
 
-    def clean_device_buffer
+    def discard_device_buffer
       @device.read(1) while @device.ready?
     end
   end
