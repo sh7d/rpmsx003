@@ -82,14 +82,14 @@ module Pmsx003
       case mode
       when :active
         if @mode != :active
-          send_command(comm: :change_mode, mode: true)
+          send_command(:change_mode, mode: true)
           init_gathering_thread if @mode != :active
         end
       when :passive
         if @mode != :passive
           @gath&.exit
           remove_instance_variable(:@gath_queue)
-          send_command(comm: :change_mode, mode: false)
+          send_command(:change_mode, mode: false)
           sleep 0.4
           discard_device_buffer
         end
@@ -141,7 +141,7 @@ module Pmsx003
       end
     end
 
-    def send_command(comm:, mode: false)
+    def send_command(comm, mode: false)
       @comm = case comm
               when :read_passive
                 Structs::Command.new(command: Commands::READ_PASSIVE, mode: 0)
