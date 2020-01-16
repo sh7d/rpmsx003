@@ -20,7 +20,9 @@ Gem::Specification.new do |spec|
   spec.bindir        = 'exe'
   spec.executables   = spec.files.grep(%r{^exe/}) { |f| File.basename(f) }
   spec.require_paths = ['lib']
-  spec.add_dependency 'rbuspirate'
+  spec.add_dependency 'rbuspirate', '>= 0.1.1'
   spec.add_dependency 'serialport', "~> 1.3"
   spec.add_dependency 'bindata', '~> 2.4'
+  spec.add_development_dependency 'rake', '~> 12.0'
+  spec.add_development_dependency 'pry', '~> 0.12'
 end
