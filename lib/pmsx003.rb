@@ -42,6 +42,8 @@ module Pmsx003
                   raise ArgumentError, 'Shitty device arg'
                 end
       @sleep_s = false
+      # geeez, this sensor is SOOOOO buggy
+      sleep(2)
       switch_mode(mode)
     end
 
@@ -55,7 +57,7 @@ module Pmsx003
         retry_times = 2
         begin
           Timeout.timeout(5) do
-            send_command(comm: :read_passive)
+            send_command(:read_passive)
             handle_response
           end
         rescue Timeout::Error
@@ -155,15 +157,15 @@ module Pmsx003
     end
 
     def send_command(comm, mode: false)
-      @comm = case comm
-              when :read_passive
-                Structs::Command.new(command: Commands::READ_PASSIVE, mode: 0)
-              when :change_mode
-                Structs::Command.new(command: Commands::Change::MODE, mode: mode)
-              when :change_sleep
-                Structs::Command.new(command: Commands::Change::SLEEP, mode: !mode)
-              end
-      @device.write(@comm.to_binary_s)
+      scomm = case comm
+             when :read_passive
+               Structs::Command.new(command: Commands::READ_PASSIVE, mode: 0)
+             when :change_mode
+               Structs::Command.new(command: Commands::Change::MODE, mode: mode)
+             when :change_sleep
+               Structs::Command.new(command: Commands::Change::SLEEP, mode: !mode)
+             end
+      @device.write(scomm.to_binary_s)
     end
 
     def handle_response
