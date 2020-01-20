@@ -41,7 +41,6 @@ module Pmsx003
                 else
                   raise ArgumentError, 'Shitty device arg'
                 end
-
       @sleep_s = false
       switch_mode(mode)
     end
@@ -97,12 +96,12 @@ module Pmsx003
       when :active
         if @mode != :active
           send_command(:change_mode, mode: true)
-          init_gathering_thread if @mode != :active
+          init_gathering_thread
         end
       when :passive
         if @mode != :passive
           @gath&.exit
-          remove_instance_variable(:@gath_queue)
+          remove_instance_variable(:@gath_queue) if defined?(@gath_queue)
           send_command(:change_mode, mode: false)
           sleep 0.4
           discard_device_buffer
