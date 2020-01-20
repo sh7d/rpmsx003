@@ -12,17 +12,19 @@ optparse = OptParse.new do |opts|
     '-d device', '--device device', String, 'Path to pmsx003 device (add bp: to use piratebus)'
   ) do |device|
     dtc = device.gsub(/^bp:/,'')
+    le_options[:buspirate] = true if device.match?(/^bp:/)
     dev_stat = File.stat(dtc).rdev rescue nil
     raise 'Connect buspirate first' unless dev_stat
     raise 'Device argument must be device' if dev_stat.zero?
 
-    le_options[:device] = device
+    le_options[:device] = dtc
   end
 end
 optparse.parse!
 le_options.freeze
 if le_options[:device]
-  pms = Pmsx003::Sensor.new(le_options[:device])
+  backend = le_options[:buspirate] ? :buspirate : :serial
+  pms = Pmsx003::Sensor.new(le_options[:device], backend: backend)
 
   binding.pry
 else

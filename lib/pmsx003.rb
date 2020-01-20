@@ -12,17 +12,31 @@ module Pmsx003
     include ChecksumHelpers
     attr_reader :last_read, :last_data, :mode, :sleep_s
 
-    def initialize(device, mode: :active)
+    def initialize(device, backend: :serial, mode: :active)
+      !%i[serial buspirate].include?(backend) &&
+        raise(ArgumentError, 'Backend can be :serial or :buspirate')
       @device = case device
                 when SerialPort
-                  device
-                when String
-                  if device.match?(/bp\:/)
+                  case backend
+                  when :serial
+                    device
+                  when :buspirate
                     initialize_buspirate(device)
-                  else
+                  end
+                when String
+                  case backend
+                  when :serial
                     SerialPort.new(device, 9_600, 8, 1, SerialPort::NONE)
+                  when :buspirate
+                    initialize_buspirate(device)
                   end
                 when Rbuspirate::Client
+                  backend == :serial &&
+                    raise(
+                      ArgumentError,
+                      'Device cannot be Rbuspirate::Client, when backend is'\
+                      ' :serial'
+                    )
                   initialize_buspirate(device)
                 else
                   raise ArgumentError, 'Shitty device arg'
