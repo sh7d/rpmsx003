@@ -15,6 +15,9 @@ module Pmsx003
     def initialize(device, backend: :serial, mode: :active)
       !%i[serial buspirate].include?(backend) &&
         raise(ArgumentError, 'Backend can be :serial or :buspirate')
+
+      @sensor_acces_mutex = Mutex.new
+
       @device = case device
                 when SerialPort
                   case backend
@@ -165,17 +168,20 @@ module Pmsx003
              when :change_sleep
                Structs::Command.new(command: Commands::Change::SLEEP, mode: !mode)
              end
-      @device.write(scomm.to_binary_s)
+
+      @sensor_acces_mutex.synchronize { @device.write(scomm.to_binary_s) }
     end
 
     def handle_response
-      @last_data = Structs::Response.read(@device).sensor_readings
+      @last_data = @sensor_acces_mutex.synchronize do
+        Structs::Response.read(@device).sensor_readings
+      end
       @last_read = Time.now
       @last_data
     end
 
     def discard_device_buffer
-      @device.read(1) while @device.ready?
+      @sensor_acces_mutex.synchronize { @device.read(1) while @device.ready? }
     end
   end
 end
